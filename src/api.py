@@ -1,7 +1,7 @@
 import pynvml
 import pyamdgpuinfo
 import pyautogui
-import amdsmi
+
 
 def is_int(n):
     try:
@@ -16,10 +16,12 @@ def detect_platform(n):
         return "Nvidia"
     except Exception:
         try:
+            import amdsmi
             pyamdgpuinfo.get_gpu(n)
             return "AMD"
         except Exception:
             return "Unknown"
+
 
 def get_gpu_series(n):
     manufact = detect_platform(n)
@@ -29,7 +31,7 @@ def get_gpu_series(n):
     if manufact == "Nvidia":
         # Nvidia
         pynvml.nvmlInit()
-        name = pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(i)) # For example NVIDIA GeForce GTX 1650 SUPER
+        name = pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(n)) # For example NVIDIA GeForce GTX 1650 SUPER
         modele = name[14:]
         if "GT " in modele:
             pyautogui.alert("GT series GPU`s are not currently supported", "Support Error")
@@ -64,3 +66,47 @@ def get_gpu_series(n):
         return int(series_number)
 
 
+def get_temp():
+    PLATRFORM = detect_platform(0)
+    if PLATRFORM == "Unknown":
+        return 0;
+    elif PLATRFORM == "Nvidia":
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+
+        return pynvml.nvmlDeviceGetTemperature(
+            handle,
+            pynvml.NVML_TEMPERATURE_GPU
+        )
+    else:
+        return 0
+
+def get_vram():
+    PLATRFORM = detect_platform(0)
+    if PLATRFORM == "Unknown":
+        return 0;
+    elif PLATRFORM == "Nvidia":
+        info = pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(0))
+        return info.total/1000000
+    else:
+        return 0
+
+def get_vram_free():
+    PLATRFORM = detect_platform(0)
+    if PLATRFORM == "Unknown":
+        return 0;
+    elif PLATRFORM == "Nvidia":
+        info = pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(0))
+        return info.free/1000000
+    else:
+        return 0
+
+
+def get_gpu_name():
+    PLATRFORM = detect_platform(0)
+    if PLATRFORM == "Unknown":
+        return "Unknown GPU";
+    elif PLATRFORM == "Nvidia":
+        return pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(0))
+    else:
+        amdsmi.amdsmi_init()
+        return amdsmi.amdsmi_get_gpu_asic_info().get("market_name")
