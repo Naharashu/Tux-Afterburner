@@ -3,3 +3,4 @@ src/dist
 src/__pycache__
 src/*.spec
 src/*.pyc
+.venv/*
