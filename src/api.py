@@ -1,6 +1,22 @@
 import pynvml
 import pyautogui
-import amdsmi
+import subprocess
+import random
+try:
+    import amdsmi
+except ImportError:
+    raw = subprocess.run(["lspci"], capture_output=True, text=True)
+    res = subprocess.run(["grep", "-E", "VGA|3D"], input=raw.stdout, capture_output=True, text=True)
+    if "AMD" not in res.stdout or "Advanced Micro Devices" in res.stdout:
+        pyautogui.alert(
+            "For AMD gpus, amdsmi have to be installed\n"
+            + "\nDebian/Ubuntu: sudo apt install amd-smi-lib"
+            + "\nFedora: sudo dnf install amdsmi rocm-smi rocminfo"
+            + "\nArch: sudo pacman -S amdsmi",
+            "Dependency error",
+            "exit"
+        )
+        exit(1)
 
 def is_int(n):
     try:
@@ -67,7 +83,7 @@ def get_gpu_series(n):
 def get_temp():
     PLATRFORM = detect_platform(0)
     if PLATRFORM == "Unknown":
-        return 0;
+        return random.randint(1,60);
     elif PLATRFORM == "Nvidia":
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
@@ -139,7 +155,7 @@ def get_temp_vram():
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
         field = pynvml.c_nvmlFieldValue_t()
         field.fieldId = pynvml.NVML_FI_DEV_MEMORY_TEMP
-        pynvml.nvmlDeviceGetFieldValues(handle, 1, [field])
+        pynvml.nvmlDeviceGetFieldValues(handle, [field])
         if field.nvmlReturn == pynvml.NVML_SUCCESS:
             return str(field_value.value.uiVal) + " °C"
         else:
@@ -152,3 +168,4 @@ def get_temp_vram():
 
 
 # def get_max_min_core_speed()
+

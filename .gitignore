@@ -1,6 +1,6 @@
-src/build
-src/dist
-src/__pycache__
+src/build/*
+src/dist/*
+src/__pycache__/*
 src/*.spec
 src/*.pyc
 .venv/*
