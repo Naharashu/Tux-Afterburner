@@ -24,11 +24,13 @@ def get_asset_path(relative_path):
     return os.path.join(os.path.abspath("."), relative_path)
 
 PATH = ""
-if(PLATFORM!="Nvidia"):
+if(PLATFORM=="Nvidia"):
     PATH = get_asset_path("assets/NVIDIA.png")
-#elif PLATFORM == "AMD":
-else:
+elif PLATFORM == "AMD":
     PATH = get_asset_path("assets/AMD.png")
+else:
+    pyautogui.alert("Intel Graphics are not currently supported", "Support warning")
+    PATH = get_asset_path("assets/INTEL.jpg")
 
 """
 
@@ -94,7 +96,7 @@ app.mainloop()
 
 """
 
-
+__fanSpeedCache = 0
 
 def main(page: ft.Page):
     page.title = "TuxAfterburner - " + api.get_gpu_name()
@@ -140,7 +142,10 @@ def main(page: ft.Page):
     async def update_fan_text():
         import asyncio
         while True:
+            if __fanSpeedCache == fanSpeedChange.value:
+                api.set_fan_speed(fanSpeedChange.value)
             labelFan.value = f"Fan Speed {fanSpeedChange.value:.0f} %"
+            __fanSpeedCache = fanSpeedChange.value
             page.update()
             await asyncio.sleep(0.5)
 

@@ -153,9 +153,9 @@ def get_temp_vram():
         return "0 °C"
     elif PLATRFORM == "Nvidia":
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        field = pynvml.c_nvmlFieldValue_t()
-        field.fieldId = pynvml.NVML_FI_DEV_MEMORY_TEMP
-        pynvml.nvmlDeviceGetFieldValues(handle, [field])
+        
+        values = pynvml.nvmlDeviceGetFieldValues(handle, [pynvml.NVML_FI_DEV_MEMORY_TEMP])
+        field = values[0]
         if field.nvmlReturn == pynvml.NVML_SUCCESS:
             return str(field_value.value.uiVal) + " °C"
         else:
@@ -167,5 +167,20 @@ def get_temp_vram():
         return str(round(temp, 1)) + " °C"
 
 
-# def get_max_min_core_speed()
+def set_fan_speed(speed):
+    PLATFORM = detect_platform(0)
+    if PLATRFORM == "Unknown":
+        return
+    elif PLATRFORM == "Nvidia":
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        i = pynvml.nvmlDeviceGetNumFans(handle)
+        for j in range(i):
+            pynvml.nvmlDeviceSetFanSpeed_v2(handle, j, speed)
+    else:
+        # AMD
+        try:
+            devices = amdsmi_get_processor_handles()
+            amdsmi.amdsmi_set_gpu_fan_speed(devices[0], 0, get_gpu_fan_speed()*speed)
+        except amdsmi.AmdSmiException as e:
+            pyautogui.alert(e, "AMD Internal Error")
 
