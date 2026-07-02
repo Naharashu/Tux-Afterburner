@@ -16,7 +16,7 @@ if os_ != "Linux":
     pyautogui.alert("Tux afterburner is supported only on desktop linux systems", "System error")
     exit(1)
 
-PLATFORM = api.get_gpu_name()
+PLATFORM = api.detect_platform(0)
 
 def get_asset_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
@@ -24,7 +24,7 @@ def get_asset_path(relative_path):
     return os.path.join(os.path.abspath("."), relative_path)
 
 PATH = ""
-if(PLATFORM=="Nvidia"):
+if PLATFORM == "Nvidia":
     PATH = get_asset_path("assets/NVIDIA.png")
 elif PLATFORM == "AMD":
     PATH = get_asset_path("assets/AMD.png")
@@ -96,7 +96,7 @@ app.mainloop()
 
 """
 
-__fanSpeedCache = 0
+
 
 def main(page: ft.Page):
     page.title = "TuxAfterburner - " + api.get_gpu_name()
@@ -105,7 +105,7 @@ def main(page: ft.Page):
     page.theme_mode = page.theme_mode.DARK
     img = ft.Image(
         src=PATH,
-        fit=ft.BoxFit.CONTAIN,
+        fit=ft.BoxFit.SCALE_DOWN,
         expand=True              
     )
 
@@ -118,7 +118,7 @@ def main(page: ft.Page):
 
     async def update_stat():
         import asyncio
-        while True:
+        while page.session.id is not None:
             statistic.value = stat()
             page.update()
             await asyncio.sleep(0.5)
@@ -131,23 +131,23 @@ def main(page: ft.Page):
         statistic,
         img
         ],
-        expand=True
+        #expand=True
     ))
 
     
-    fanSpeedChange = ft.Slider(label="Fan speed %", value=70, min=0, max=100, round=0)
+    fanSpeedChange = ft.Slider(label="Fan speed %", value=api.__get_fan_speed(), min=0, max=100, round=0)
     labelFan = ft.Text("Fan Speed " + str(fanSpeedChange.value) + " %")
 
 
     async def update_fan_text():
         import asyncio
-        while True:
-            if __fanSpeedCache == fanSpeedChange.value:
+        __fanSpeedCache = api.get_gpu_fan_speed()
+        while page.session.id is not None:
+            if __fanSpeedCache != fanSpeedChange.value:
                 api.set_fan_speed(fanSpeedChange.value)
-            labelFan.value = f"Fan Speed {fanSpeedChange.value:.0f} %"
-            __fanSpeedCache = fanSpeedChange.value
-            page.update()
-            await asyncio.sleep(0.5)
+                labelFan.value = f"Fan Speed {fanSpeedChange.value:.0f} %"
+                page.update()
+            await asyncio.sleep(0.05)
 
     page.run_task(update_fan_text)
     
@@ -158,5 +158,20 @@ def main(page: ft.Page):
         ]
     ))
 
+    def handle_events(e: ft.WindowEvent):
+        if e == ft.WindowEventType.CLOSE:
+            cleanup()
+        
+    ft.Window.prevent_close = True
+    page.window.on_event = handle_events
 
-ft.app(target=main) 
+    def cleanup():
+        if(PLATFORM=="Nvidia"):
+            api.pynvml.nvmlShutdown()
+        elif(PLATFORM=="AMD"):
+            api.amdsmi.amdsmi_shut_down()
+        print("Exiting...")
+        ft.Window.destroy()
+
+
+ft.run(main) 

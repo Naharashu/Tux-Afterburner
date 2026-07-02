@@ -7,7 +7,7 @@ try:
 except ImportError:
     raw = subprocess.run(["lspci"], capture_output=True, text=True)
     res = subprocess.run(["grep", "-E", "VGA|3D"], input=raw.stdout, capture_output=True, text=True)
-    if "AMD" not in res.stdout or "Advanced Micro Devices" in res.stdout:
+    if "AMD" not in res.stdout or "Advanced Micro Devices" not in res.stdout:
         pyautogui.alert(
             "For AMD gpus, amdsmi have to be installed\n"
             + "\nDebian/Ubuntu: sudo apt install amd-smi-lib"
@@ -25,15 +25,29 @@ def is_int(n):
     except ValueError:
         return False
 
+GPU_MANUF = ""
+
+
 def detect_platform(n):
+    global GPU_MANUF
+    if GPU_MANUF != "": 
+        return GPU_MANUF
     try:
         pynvml.nvmlInit()
+        pynvml.nvmlDeviceGetHandleByIndex(0)
+        GPU_MANUF = "Nvidia"
         return "Nvidia"
     except Exception:
         try:
-            pyamdgpuinfo.get_gpu(n)
+            amdsmi.amdsmi_init()
+            devices = amdsmi.amdsmi_get_processor_handles()
+            if len(devices) == 0:
+                GPU_MANUF = "Unknown"
+                return "Unknown"
+            GPU_MANUF = "Unknown"
             return "AMD"
         except Exception:
+            GPU_MANUF = "Unknown"
             return "Unknown"
 
 
@@ -67,11 +81,13 @@ def get_gpu_series(n):
     else:
         # AMD
         amdsmi.amdsmi_init()
-        temp = amdsmi.amdsmi_get_gpu_asic_info()
+        devices = amdsmi.amdsmi_get_processor_handles()
+        temp = amdsmi.amdsmi_get_gpu_asic_info(devices[0])
         name = temp.get("market_name") # for example AMD Radeon RX 9060
         if "FirePro" in name:
             pyautogui.alert("FirePro gpu`s are not supported", "Support Error")
             exit(1)
+        series_number = ""
         modele = name[13:] if "Pro" not in name else name[15:] 
         for c in modele:
             if not is_int(c):
@@ -81,10 +97,10 @@ def get_gpu_series(n):
 
 
 def get_temp():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return random.randint(1,60);
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
         return pynvml.nvmlDeviceGetTemperature(
@@ -93,94 +109,116 @@ def get_temp():
         )
     else:
         # AMD
-        devices = amdsmi_get_processor_handles()
+        devices = amdsmi.amdsmi_get_processor_handles()
         temp = amdsmi.amdsmi_get_temp_metric(devices[0], amdsmi.AmdSmiTemperatureType.EDGE, amdsmi.AmdSmiTemperatureMetric.CURRENT)/1000
         return round(temp, 1)
 
 def get_vram():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return 0;
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         info = pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(0))
         return round(info.total/1000000, 2)
     else:
         # AMD
-        devices = amdsmi_get_processor_handles()
+        devices = amdsmi.amdsmi_get_processor_handles()
         info = amdsmi.amdsmi_get_gpu_vram_usage(devices[0])
         return round(info.get("vram_total"), 2)
 
 def get_vram_free():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return 0;
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         info = pynvml.nvmlDeviceGetMemoryInfo(pynvml.nvmlDeviceGetHandleByIndex(0))
         return round(info.free/1000000, 2)
     else:
         # AMD
-        devices = amdsmi_get_processor_handles()
+        devices = amdsmi.amdsmi_get_processor_handles()
         info = amdsmi.amdsmi_get_gpu_vram_usage(devices[0])
         return round(info.get("vram_total")-info.get("vram_used"), 2)
 
 
 def get_gpu_name():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return "Unknown GPU";
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         return pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(0))
     else:
-        amdsmi.amdsmi_init()
-        return amdsmi.amdsmi_get_gpu_asic_info().get("market_name")
+        devices = amdsmi.amdsmi_get_processor_handles()
+        return amdsmi.amdsmi_get_gpu_asic_info(devices[0]).get("market_name")
 
 def get_gpu_fan_speed():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return 0;
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         info = pynvml.nvmlDeviceGetFanSpeedRPM(pynvml.nvmlDeviceGetHandleByIndex(0))
         return info
     else:
         # AMD
-        devices = amdsmi_get_processor_handles()
+        devices = amdsmi.amdsmi_get_processor_handles()
         info = amdsmi.amdsmi_get_gpu_fan_rpms(devices[0], 0)
         return info
 
 def get_temp_vram():
-    PLATRFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
         return "0 °C"
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
         
         values = pynvml.nvmlDeviceGetFieldValues(handle, [pynvml.NVML_FI_DEV_MEMORY_TEMP])
         field = values[0]
         if field.nvmlReturn == pynvml.NVML_SUCCESS:
-            return str(field_value.value.uiVal) + " °C"
+            return str(field.value.uiVal) + " °C"
         else:
             return "Unsupported"
     else:
         # AMD
-        devices = amdsmi_get_processor_handles()
+        devices = amdsmi.amdsmi_get_processor_handles()
         temp = amdsmi.amdsmi_get_temp_metric(devices[0], amdsmi.AmdSmiTemperatureType.VRAM , amdsmi.AmdSmiTemperatureMetric.CURRENT)/1000
         return str(round(temp, 1)) + " °C"
 
 
 def set_fan_speed(speed):
     PLATFORM = detect_platform(0)
-    if PLATRFORM == "Unknown":
+    if PLATFORM == "Unknown":
         return
-    elif PLATRFORM == "Nvidia":
+    elif PLATFORM == "Nvidia":
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
         i = pynvml.nvmlDeviceGetNumFans(handle)
         for j in range(i):
-            pynvml.nvmlDeviceSetFanSpeed_v2(handle, j, speed)
+            try:
+                pynvml.nvmlDeviceSetFanSpeed_v2(handle, j, speed)
+            except Exception as e:
+                pyautogui.alert(e, "NVML Internal Error")
+                print(e)
     else:
         # AMD
         try:
-            devices = amdsmi_get_processor_handles()
-            amdsmi.amdsmi_set_gpu_fan_speed(devices[0], 0, get_gpu_fan_speed()*speed)
+            devices = amdsmi.amdsmi_get_processor_handles()
+            amdsmi.amdsmi_set_gpu_fan_speed(devices[0], 0, amdsmi.amdsmi_get_gpu_fan_speed_max(devices[0])*speed/100)
+        except amdsmi.AmdSmiException as e:
+            pyautogui.alert(e, "AMD Internal Error")
+
+
+def __get_fan_speed():
+    PLATFORM = detect_platform(0)
+    if PLATFORM == "Unknown":
+        return 0
+    elif PLATFORM == "Nvidia":
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        return pynvml.nvmlDeviceGetFanSpeed(handle) 
+    else:
+        # AMD
+        try:
+            devices = amdsmi.amdsmi_get_processor_handles()
+            curr = amdsmi.amdsmi_get_gpu_fan_speed(devices[0], 0)
+            max = amdsmi.amdsmi_get_gpu_fan_speed_max(devices[0], 0)
+            return curr / max * 100
         except amdsmi.AmdSmiException as e:
             pyautogui.alert(e, "AMD Internal Error")
 
