@@ -15,9 +15,9 @@
 
 - Power limiting (!)
 
-- FAN speed control (!)
+- FAN speed control (?)
 
-- Monitoring (!)
+- Monitoring (?)
 
 - Apply on boot (!)
 
